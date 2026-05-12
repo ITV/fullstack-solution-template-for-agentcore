@@ -723,13 +723,16 @@ export class BackendStack extends cdk.NestedStack {
     // Policy Engine access — required for the Gateway to verify and evaluate Cedar policies.
     // AuthorizeAction is needed on both the policy engine (to query policy decisions)
     // and the gateway itself (to apply those decisions to incoming requests).
+    // CheckAuthorizePermissions uses a compound resource ARN format
+    // (/policy-engines/{id}/target-resource/{gateway-arn}) requiring the /policy-engines/* pattern.
     gatewayRole.addToPolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: ["bedrock-agentcore:GetPolicyEngine", "bedrock-agentcore:AuthorizeAction", "bedrock-agentcore:PartiallyAuthorizeActions"],
+        actions: ["bedrock-agentcore:GetPolicyEngine", "bedrock-agentcore:AuthorizeAction", "bedrock-agentcore:PartiallyAuthorizeActions", "bedrock-agentcore:CheckAuthorizePermissions"],
         resources: [
           `arn:aws:bedrock-agentcore:${this.region}:${this.account}:policy-engine/*`,
           `arn:aws:bedrock-agentcore:${this.region}:${this.account}:gateway/*`,
+          `arn:aws:bedrock-agentcore:${this.region}:${this.account}:/policy-engines/*`,
         ],
       })
     )
