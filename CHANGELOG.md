@@ -7,9 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- User identity propagation from frontend JWT through M2M tokens to Cedar policy evaluation at AgentCore Gateway
+- Cedar Policy Engine and Cedar Policy lifecycle management via Custom Resource Lambda (`infra-cdk/lambdas/cedar-policy/`)
+- Cognito V3 Pre-Token Generation Lambda for injecting custom claims into M2M tokens (`infra-cdk/lambdas/pretoken-v3/`)
+- Cedar policy file with custom claim-based access control — two versions for allow/deny testing (`gateway/policies/policy.cedar`)
+- Cognito ESSENTIALS tier for V3 Pre-Token Lambda trigger support
+- Direct Cognito `/oauth2/token` call with `aws_client_metadata` for user identity propagation (Approach 1) across all 6 agent patterns
+- Alternative `@requires_access_token` decorator approach (Approach 2) documented and commented out in each pattern's `tools/gateway.py`
+- Identity propagation and Cedar policy documentation (`docs/IDENTITY_POLICY.md`)
+- Cedar policy syntax, capabilities, and reference documentation (`docs/CEDAR_POLICY_GUIDE.md`)
+- Identity provider swap and Gateway interceptors guide (`docs/REPLACING_COGNITO.md`)
+
 ### Changed
 
+- Updated all 6 agent patterns to pass `user_id` to Gateway client for identity-aware M2M tokens
+- Updated NAT Gateway documentation in `docs/DEPLOYMENT.md` for VPC mode with identity propagation
+- Updated root `README.md` architecture flow and project structure
 - Updated architecture diagram with latest logos (`docs/architecture-diagram/FAST-architecture-20260403.png`)
+
+### Fixed
+
+- ZIP packager: permissive pattern directory reader with recursive subdirectory support
+- ZIP packager: added `patterns/utils/` to deployment package
+- ZIP packager: renamed repo-root `tools/` to `agentcore_tools/` to avoid conflict with pattern's `tools/` directory
+- ZIP packager: dynamic entry point detection instead of hardcoded `basic_agent.py`
+- Cognito domain creation ordering to resolve "Internal error from downstream service" with newer CDK versions
+- `langgraph>=1.1.5` version bump to fix `ServerInfo` import error
+- `copilotkit>=0.1.84` version bump to fix compatibility with newer langgraph
+- Added placeholder graph in `ActorAwareLangGraphAgent.__init__` for newer copilotkit validation
 
 ## [0.4.1] - 2026-03-25
 
