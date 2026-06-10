@@ -37,7 +37,6 @@ To use dynamic group assignment, replace the hardcoded mapping below with a
 DynamoDB table keyed by the user's sub (UUID). See docs/IDENTITY_POLICY.md.
 """
 
-
 # ============================================================================
 # USER-TO-GROUP MAPPING
 # ============================================================================
