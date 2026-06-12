@@ -7,28 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-06-12
+
 ### Added
 
-- User identity propagation from frontend JWT through M2M tokens to Cedar policy evaluation at AgentCore Gateway
-- Cedar Policy Engine and Cedar Policy lifecycle management via Custom Resource Lambda (`infra-cdk/lambdas/cedar-policy/`)
+- **AgentCore Policy Integration** — Full user identity propagation from frontend JWT through M2M tokens to Cedar policy evaluation at AgentCore Gateway
+- Cedar Policy Engine and lifecycle management via Custom Resource Lambda (`infra-cdk/lambdas/cedar-policy/`)
 - Cognito V3 Pre-Token Generation Lambda for injecting custom claims into M2M tokens (`infra-cdk/lambdas/pretoken-v3/`)
 - Cedar policy file with custom claim-based access control — two versions for allow/deny testing (`gateway/policies/policy.cedar`)
 - Cognito ESSENTIALS tier for V3 Pre-Token Lambda trigger support
-- Direct Cognito `/oauth2/token` call with `aws_client_metadata` for user identity propagation (Approach 1) across all 6 agent patterns
-- Alternative `@requires_access_token` decorator approach (Approach 2) documented and commented out in each pattern's `tools/gateway.py`
+- Direct Cognito `/oauth2/token` call with `aws_client_metadata` for user identity propagation across all 6 agent patterns
+- Alternative `@requires_access_token` decorator approach documented and commented out in each pattern's `tools/gateway.py`
+- **Long-Term Memory** — Configurable long-term semantic memory for Strands-based agents via `use_long_term_memory` in `config.yaml`
+- LTM `top_k` and `relevance_score` parameters exposed in config
+- **Context Management Guide** (`docs/CONTEXT_MANAGEMENT.md`) — Sliding window, summarization, LangGraph middleware, and custom hook-based approaches
+- **Session Management Guide** (`docs/SESSION_MANAGEMENT.md`) — Three patterns: AgentCore Memory only, Memory + DynamoDB, and S3SessionManager
 - Identity propagation and Cedar policy documentation (`docs/IDENTITY_POLICY.md`)
 - Cedar policy syntax, capabilities, and reference documentation (`docs/CEDAR_POLICY_GUIDE.md`)
 - Identity provider swap and Gateway interceptors guide (`docs/REPLACING_COGNITO.md`)
+- `ListGatewayTargets` IAM permission for Cedar Policy Lambda to support policy creation validation
+- `CheckAuthorizePermissions` on Gateway Role for Policy Engine attachment
+- CodeBuild deployment documentation for CloudFormation teardown
+- Updated architecture diagram with latest logos (`docs/architecture-diagram/FAST-architecture-20260403.png`)
 
 ### Changed
 
-- Updated all 6 agent patterns to pass `user_id` to Gateway client for identity-aware M2M tokens
-- Updated NAT Gateway documentation in `docs/DEPLOYMENT.md` for VPC mode with identity propagation
-- Updated root `README.md` architecture flow and project structure
-- Updated architecture diagram with latest logos (`docs/architecture-diagram/FAST-architecture-20260403.png`)
+- All 6 agent patterns updated to pass `user_id` to Gateway client for identity-aware M2M tokens
+- Pre-Token Lambda rewritten to use `USER_ROLE_MAP` dictionary keyed by Cognito `sub` (UUID) instead of email-based if/else logic
+- AG-UI Strands agent refactored to build agent directly in entrypoint with optional Memory support
+- AG-UI LangGraph agent simplified entrypoint
+- Documentation updated to use UUID placeholders instead of email addresses (`docs/IDENTITY_POLICY.md`, `docs/CEDAR_POLICY_GUIDE.md`, `docs/REPLACING_COGNITO.md`)
+- NAT Gateway documentation updated in `docs/DEPLOYMENT.md` for VPC mode with identity propagation
+- CodeBuild deploy script updated to package tracked files only with ephemeral resources
+- Consolidated `.prettierrc` to top-level
+- Root `README.md` architecture flow and project structure updated
 
 ### Fixed
 
+- AG-UI Strands agent session memory recall restored with durable AgentCore Memory
+- Cedar policy never matching due to email-based substring matching against UUID identifiers
+- Cedar policy name shortened to stay within 48-character API limit
 - ZIP packager: permissive pattern directory reader with recursive subdirectory support
 - ZIP packager: added `patterns/utils/` to deployment package
 - ZIP packager: renamed repo-root `tools/` to `agentcore_tools/` to avoid conflict with pattern's `tools/` directory
@@ -37,6 +55,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `langgraph>=1.1.5` version bump to fix `ServerInfo` import error
 - `copilotkit>=0.1.84` version bump to fix compatibility with newer langgraph
 - Added placeholder graph in `ActorAwareLangGraphAgent.__init__` for newer copilotkit validation
+- Frontend: reset UUID when a new chat is initiated
+- CodeBuild deploy script removed git dependency
+
+### Security
+
+- Bumped `hono` from 4.12.14 to 4.12.23 in frontend
+- Bumped `react-router` and `react-router-dom` in frontend
+- Bumped `vitest` from 4.0.18 to 4.1.0 in frontend
+- Bumped `js-cookie` from 3.0.5 to 3.0.7 in frontend
+- Bumped `qs` from 6.14.2 to 6.15.2 in frontend
+- Bumped `postcss` from 8.5.6 to 8.5.14 in frontend
+- Bumped `fast-uri` from 3.1.0 to 3.1.2 in frontend
+- Bumped `fast-xml-parser` and `@aws-sdk/xml-builder` in frontend
+- Bumped `lodash` from 4.17.23 to 4.18.1 in frontend
+- Bumped `ip-address` and `express-rate-limit` in frontend
+- Bumped `yaml` from 2.8.2 to 2.8.3 in infra-cdk
+- Bumped `picomatch` in frontend and infra-cdk
 
 ## [0.4.1] - 2026-03-25
 
