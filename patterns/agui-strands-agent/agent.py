@@ -6,7 +6,7 @@ import logging
 import os
 
 from ag_ui.core import RunAgentInput, RunErrorEvent
-from ag_ui_strands import StrandsAgent
+from ag_ui_strands import StrandsAgent, StrandsAgentConfig
 from bedrock_agentcore.memory.integrations.strands.config import AgentCoreMemoryConfig
 from bedrock_agentcore.memory.integrations.strands.session_manager import (
     AgentCoreMemorySessionManager,
@@ -37,36 +37,48 @@ MODEL = BedrockModel(
 CODE_INTERPRETER = StrandsCodeInterpreterTools(REGION).execute_python_securely
 
 
-def get_memory_session_manager(
-    actor_id: str, session_id: str
-) -> AgentCoreMemorySessionManager | None:
-    """Return an AgentCore Memory session manager, or None when MEMORY_ID is unset."""
-    if not MEMORY_ID:
-        return None
-    return AgentCoreMemorySessionManager(
-        AgentCoreMemoryConfig(
-            memory_id=MEMORY_ID, session_id=session_id, actor_id=actor_id
-        ),
-        region_name=REGION,
-    )
+def _make_session_manager_provider(actor_id: str):
+    """Per-thread AgentCore Memory session-manager factory for the AG-UI adapter.
+
+    ag-ui-strands attaches the returned manager to the agent it runs (keyed by
+    actor_id + thread_id). A session_manager on the template Agent is ignored.
+    Returns None when MEMORY_ID is unset.
+    """
+
+    def provider(run_input: RunAgentInput) -> AgentCoreMemorySessionManager | None:
+        if not MEMORY_ID:
+            return None
+        session_id = run_input.thread_id or actor_id
+        return AgentCoreMemorySessionManager(
+            AgentCoreMemoryConfig(
+                memory_id=MEMORY_ID, session_id=session_id, actor_id=actor_id
+            ),
+            region_name=REGION,
+        )
+
+    return provider
 
 
 @app.entrypoint
 async def invocations(payload: dict, context: RequestContext):
     input_data = RunAgentInput.model_validate(payload)
     actor_id = extract_user_id_from_context(context)
-    session_id = input_data.thread_id or actor_id
 
+    # session_manager is supplied per-thread via the provider below, not here.
     agent = Agent(
         model=MODEL,
         system_prompt=SYSTEM_PROMPT,
         tools=[create_gateway_mcp_client(actor_id), CODE_INTERPRETER],
-        session_manager=get_memory_session_manager(actor_id, session_id),
     )
     agui_agent = StrandsAgent(
         agent=agent,
         name="agui_strands_agent",
         description="AG-UI Strands agent with Gateway MCP tools and Code Interpreter",
+        config=StrandsAgentConfig(
+            session_manager_provider=_make_session_manager_provider(actor_id),
+            # Disable client-side replay so the session manager owns history.
+            replay_history_into_strands=False,
+        ),
     )
 
     try:
