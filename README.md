@@ -29,7 +29,7 @@ Try asking the agent to analyze text or execute Python code to see these tools i
 
 If you are a delivery scientist or engineer who wants to use FAST to build a full stack application, this is the section for you.
 
-FAST is designed to be forked and deployed out of the box with a security-approved baseline system working. Your task will be to customize it to create your own full stack application to to do (literally) anything on AgentCore.
+FAST is designed to be forked and deployed out of the box with a security-approved baseline system working. Your task will be to customize it to create your own full stack application to do (literally) anything on AgentCore.
 
 Deploying the full stack out-of-the-box FAST baseline system is only a few cdk commands once you have forked the repo, namely: 
 
