@@ -281,13 +281,16 @@ data "aws_iam_policy_document" "runtime_policy" {
   }
 
   # SecretsManagerOAuth2Access
-  # Runtime needs to read OAuth2 credentials from Token Vault secret
-  # created by AgentCore Identity (not the machine client secret directly)
+  # Runtime needs to read two secrets:
+  # 1. Machine client secret (created by this module, read directly by
+  #    get_gateway_access_token() in patterns/utils/auth.py)
+  # 2. Token Vault OAuth2 secret (created by AgentCore Identity)
   statement {
     sid     = "SecretsManagerOAuth2Access"
     effect  = "Allow"
     actions = ["secretsmanager:GetSecretValue"]
     resources = [
+      aws_secretsmanager_secret.machine_client_secret.arn,
       "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:bedrock-agentcore-identity!default/oauth2/${var.stack_name_base}-runtime-gateway-auth*"
     ]
   }
