@@ -147,6 +147,78 @@ def parse_tfvars(tfvars_path: Path) -> Dict[str, str]:
     return config
 
 
+MODULE_SOURCE_HINT = "fullstack-solution-template-for-agentcore/infra-terraform"
+
+
+def find_root_module_dir(start_dir: Path) -> Optional[Path]:
+    """
+    Walk up from start_dir to find the Terraform/Terragrunt root directory that
+    includes this template as a module (e.g. agentcore-awssample.tf), as
+    opposed to running terraform directly inside the template itself.
+
+    Args:
+        start_dir: Directory to start searching upward from (the template dir)
+
+    Returns:
+        Path to the root module directory, or None if not found
+    """
+    current = start_dir
+    for _ in range(6):
+        for tf_file in current.glob("*.tf"):
+            try:
+                content = tf_file.read_text()
+            except OSError:
+                continue
+            if MODULE_SOURCE_HINT in content and re.search(
+                r'module\s+"[^"]+"\s*{', content
+            ):
+                return current
+        if current.parent == current:
+            break
+        current = current.parent
+    return None
+
+
+def parse_backend_pattern_from_module(root_dir: Path) -> Optional[str]:
+    """
+    Extract backend_pattern from the module block that includes this template
+    (e.g. in agentcore-awssample.tf), for setups that pass variables directly
+    to the module instead of using terraform.tfvars.
+
+    Args:
+        root_dir: Directory containing the calling module block
+
+    Returns:
+        The backend_pattern value if found, otherwise None
+    """
+    for tf_file in root_dir.glob("*.tf"):
+        content = tf_file.read_text()
+        if MODULE_SOURCE_HINT not in content:
+            continue
+
+        match = re.search(r'\bbackend_pattern\s*=\s*"([^"]+)"', content)
+        if match:
+            return match.group(1)
+
+    return None
+
+
+def detect_tf_binary(root_dir: Path) -> str:
+    """
+    Determine whether to drive Terraform via Terragrunt or plain terraform.
+
+    Args:
+        root_dir: Directory commands will be run from
+
+    Returns:
+        "terragrunt" if a terragrunt.hcl is present there and terragrunt is
+        installed, otherwise "terraform"
+    """
+    if (root_dir / "terragrunt.hcl").exists() and check_prerequisite("terragrunt"):
+        return "terragrunt"
+    return "terraform"
+
+
 def get_file_size_human(filepath: str) -> str:
     """
     Get human-readable file size.
@@ -168,17 +240,20 @@ def get_file_size_human(filepath: str) -> str:
 # --- Terraform output functions ---
 
 
-def get_terraform_outputs(terraform_dir: Path) -> Dict[str, str]:
+def get_terraform_outputs(
+    terraform_dir: Path, tf_bin: str = "terraform"
+) -> Dict[str, str]:
     """
-    Fetch Terraform outputs via terraform output command.
+    Fetch Terraform outputs via the terraform/terragrunt output command.
 
     Args:
-        terraform_dir: Path to the Terraform directory
+        terraform_dir: Path to the Terraform/Terragrunt directory
+        tf_bin: Binary to invoke ("terraform" or "terragrunt")
 
     Returns:
         Dictionary mapping output keys to values
     """
-    result = run_command(["terraform", "output", "-json"], cwd=str(terraform_dir))
+    result = run_command([tf_bin, "output", "-json"], cwd=str(terraform_dir))
 
     raw_outputs = json.loads(result.stdout)
 
@@ -409,6 +484,13 @@ def main() -> int:
     frontend_dir = project_root / "frontend"
     tfvars_path = terraform_dir / "terraform.tfvars"
 
+    # The template can either be applied directly (terraform.tfvars + state in
+    # terraform_dir) or included as a module from a parent Terraform/
+    # Terragrunt root (e.g. agentcore-awssample.tf) that owns the (possibly
+    # remote) state. Prefer the root module dir when one is found.
+    root_dir = find_root_module_dir(terraform_dir) or terraform_dir
+    tf_bin = detect_tf_binary(root_dir)
+
     print()
     print("========================================")
     print("  Frontend Deployment (Terraform)      ")
@@ -420,7 +502,7 @@ def main() -> int:
 
     # Validate prerequisites
     log_info("Validating prerequisites...")
-    prerequisites = ["npm", "aws", "node", "terraform"]
+    prerequisites = ["npm", "aws", "node", tf_bin]
     for prereq in prerequisites:
         if not check_prerequisite(prereq):
             log_error(f"{prereq} is not installed")
@@ -437,20 +519,32 @@ def main() -> int:
         log_info("Run 'aws configure' to set up your AWS credentials")
         return 1
 
-    # Verify Terraform state exists
-    if not (terraform_dir / "terraform.tfstate").exists():
-        log_error("Terraform state not found. Run 'terraform apply' first.")
-        return 1
+    # Verify we know where to run terraform/terragrunt from. Remote backends
+    # don't leave a local terraform.tfstate file, so we only do that check
+    # when running directly inside the template (no parent root module found).
+    if root_dir != terraform_dir:
+        log_info(f"Using root module directory: {root_dir} (via {tf_bin})")
+    elif not (terraform_dir / "terraform.tfstate").exists():
+        log_warning("No local terraform.tfstate found - assuming a remote backend")
 
     # Fetch Terraform outputs
-    log_info("Fetching configuration from Terraform outputs...")
+    log_info(f"Fetching configuration from {tf_bin} outputs...")
     try:
-        outputs = get_terraform_outputs(terraform_dir)
+        outputs = get_terraform_outputs(root_dir, tf_bin)
     except subprocess.CalledProcessError as e:
-        log_error(f"Failed to fetch Terraform outputs: {e.stderr}")
+        log_error(f"Failed to fetch {tf_bin} outputs: {e.stderr}")
+        log_info(f"Make sure '{tf_bin} apply' has been run in {root_dir}")
         return 1
     except json.JSONDecodeError as e:
-        log_error(f"Failed to parse Terraform outputs: {e}")
+        log_error(f"Failed to parse {tf_bin} outputs: {e}")
+        return 1
+
+    if not outputs:
+        log_error(
+            f"No outputs found in {root_dir}. If this template is included as "
+            "a module, add matching 'output' blocks in the root module that "
+            "forward the module's outputs (see outputs.tf)."
+        )
         return 1
 
     # Validate required outputs
@@ -474,12 +568,15 @@ def main() -> int:
     log_success(f"Staging Bucket: {deployment_bucket}")
     log_success(f"Region: {region}")
 
-    # Get agent pattern
+    # Get agent pattern: CLI override > module block (e.g.
+    # agentcore-awssample.tf) > terraform.tfvars > default
     if args.pattern:
         pattern = args.pattern
     else:
-        tfvars = parse_tfvars(tfvars_path)
-        pattern = tfvars.get("backend_pattern", "strands-single-agent")
+        pattern = parse_backend_pattern_from_module(root_dir)
+        if pattern is None:
+            tfvars = parse_tfvars(tfvars_path)
+            pattern = tfvars.get("backend_pattern", "strands-single-agent")
 
     log_info(f"Agent pattern: {pattern}")
 
