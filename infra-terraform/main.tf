@@ -51,6 +51,9 @@ module "cognito" {
   stack_name_base  = var.stack_name_base
   admin_user_email = var.admin_user_email
 
+  # Reuse an existing user pool instead of creating a new one, if provided
+  existing_user_pool_id = var.existing_user_pool_id
+
   # Use the predictable Amplify URL from the app_url output
   amplify_url = module.amplify_hosting.app_url
 
@@ -82,10 +85,11 @@ module "backend" {
   backend_vpc_security_group_ids = var.backend_vpc_security_group_ids
 
   # Cognito configuration
-  user_pool_id       = module.cognito.user_pool_id
-  user_pool_arn      = module.cognito.user_pool_arn
-  web_client_id      = module.cognito.web_client_id
-  cognito_domain_url = module.cognito.cognito_domain_url
+  user_pool_id                  = module.cognito.user_pool_id
+  user_pool_arn                 = module.cognito.user_pool_arn
+  web_client_id                 = module.cognito.web_client_id
+  cognito_domain_url            = module.cognito.cognito_domain_url
+  additional_allowed_client_ids = var.additional_allowed_client_ids
 
   # Frontend URL for CORS
   frontend_url = module.amplify_hosting.app_url

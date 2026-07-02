@@ -17,3 +17,16 @@ variable "amplify_url" {
   type        = string
   default     = null
 }
+
+# =============================================================================
+# Existing User Pool (Optional)
+# =============================================================================
+# When set, the module reuses an existing Cognito User Pool (e.g. one already
+# used elsewhere, such as for ALB authentication) instead of creating a new
+# one. A new app client for the frontend is still created inside that pool.
+
+variable "existing_user_pool_id" {
+  description = "ID of an existing Cognito User Pool to reuse. If null (default), a new user pool is created. The pool's hosted-UI domain is looked up automatically."
+  type        = string
+  default     = null
+}

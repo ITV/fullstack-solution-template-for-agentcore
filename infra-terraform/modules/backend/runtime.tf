@@ -280,6 +280,25 @@ data "aws_iam_policy_document" "runtime_policy" {
     ]
   }
 
+  # AWSMarketplaceModelAccess
+  # Third-party foundation models (e.g. Anthropic Claude) are fulfilled through AWS
+  # Marketplace. Bedrock verifies the model entitlement using the invoking role's
+  # credentials on each call, which requires these actions — otherwise ConverseStream
+  # fails with AccessDeniedException even when the account already has an ACTIVE
+  # model agreement.
+  # TODO: narrow back to ViewSubscriptions only once AccessDeniedException is confirmed
+  # resolved — Subscribe/Unsubscribe are temporarily included to rule out scope as the cause.
+  statement {
+    sid    = "AWSMarketplaceModelAccess"
+    effect = "Allow"
+    actions = [
+      "aws-marketplace:ViewSubscriptions",
+      "aws-marketplace:Subscribe",
+      "aws-marketplace:Unsubscribe"
+    ]
+    resources = ["*"]
+  }
+
   # SecretsManagerOAuth2Access
   # Runtime needs to read two secrets:
   # 1. Machine client secret (created by this module, read directly by
@@ -456,10 +475,12 @@ resource "aws_bedrockagentcore_agent_runtime" "main" {
   }
 
   # JWT authorizer configuration (Cognito)
+  # allowed_clients accepts multiple app client IDs, but they must all belong
+  # to the single user pool referenced by discovery_url (one issuer per Runtime).
   authorizer_configuration {
     custom_jwt_authorizer {
       discovery_url   = local.oidc_discovery_url
-      allowed_clients = [var.web_client_id]
+      allowed_clients = concat([var.web_client_id], var.additional_allowed_client_ids)
     }
   }
 

@@ -70,6 +70,12 @@ variable "web_client_id" {
   type        = string
 }
 
+variable "additional_allowed_client_ids" {
+  description = "Extra Cognito app client IDs, from the same user pool referenced by user_pool_id, that the Runtime JWT authorizer should also trust in addition to web_client_id"
+  type        = list(string)
+  default     = []
+}
+
 # =============================================================================
 # Amplify Configuration (passed from amplify module)
 # =============================================================================

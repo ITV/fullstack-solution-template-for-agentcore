@@ -16,6 +16,9 @@ locals {
   account_id = data.aws_caller_identity.current.account_id
   region     = data.aws_region.current.id
 
+  # Reuse an existing pool if provided, otherwise create a new one
+  use_existing_pool = var.existing_user_pool_id != null
+
   # Cognito domain prefix (must be globally unique and lowercase)
   domain_prefix = "${lower(replace(var.stack_name_base, "_", "-"))}-${local.account_id}-${local.region}"
 
@@ -46,6 +49,8 @@ EOF
 # Main user pool for authentication with password policy and invitation templates
 
 resource "aws_cognito_user_pool" "main" {
+  count = local.use_existing_pool ? 0 : 1
+
   name = "${var.stack_name_base}-user-pool"
 
   # Admin-only user creation (self sign-up disabled)
@@ -108,22 +113,45 @@ resource "aws_cognito_user_pool" "main" {
 }
 
 # =============================================================================
+# Existing User Pool Lookup (when existing_user_pool_id is set)
+# =============================================================================
+
+data "aws_cognito_user_pool" "existing" {
+  count = local.use_existing_pool ? 1 : 0
+
+  user_pool_id = var.existing_user_pool_id
+}
+
+locals {
+  # Effective pool identity, regardless of whether it was created here or reused
+  effective_user_pool_id  = local.use_existing_pool ? var.existing_user_pool_id : aws_cognito_user_pool.main[0].id
+  effective_user_pool_arn = local.use_existing_pool ? data.aws_cognito_user_pool.existing[0].arn : aws_cognito_user_pool.main[0].arn
+  effective_domain        = local.use_existing_pool ? data.aws_cognito_user_pool.existing[0].domain : aws_cognito_user_pool_domain.main[0].domain
+}
+
+# =============================================================================
 # Cognito User Pool Domain
 # =============================================================================
-# Domain for hosted UI with managed login V2
+# Domain for hosted UI with managed login V2.
+# Skipped when reusing an existing pool — it already has a domain.
 
 resource "aws_cognito_user_pool_domain" "main" {
+  count = local.use_existing_pool ? 0 : 1
+
   domain       = local.domain_prefix
-  user_pool_id = aws_cognito_user_pool.main.id
+  user_pool_id = aws_cognito_user_pool.main[0].id
 }
 
 # =============================================================================
 # Cognito Managed Login Branding (V2)
 # =============================================================================
-# Required for the v2 managed login to display properly
+# Required for the v2 managed login to display properly.
+# Skipped when reusing an existing pool to avoid touching its branding.
 
 resource "aws_cognito_managed_login_branding" "main" {
-  user_pool_id = aws_cognito_user_pool.main.id
+  count = local.use_existing_pool ? 0 : 1
+
+  user_pool_id = aws_cognito_user_pool.main[0].id
   client_id    = aws_cognito_user_pool_client.web.id
 
   # Use Cognito's default styles
@@ -139,7 +167,7 @@ resource "aws_cognito_managed_login_branding" "main" {
 
 resource "aws_cognito_user_pool_client" "web" {
   name         = "${var.stack_name_base}-client"
-  user_pool_id = aws_cognito_user_pool.main.id
+  user_pool_id = local.effective_user_pool_id
 
   # No secret for public client
   generate_secret = false
@@ -186,7 +214,7 @@ resource "aws_cognito_user_pool_client" "web" {
 resource "aws_cognito_user" "admin" {
   count = var.admin_user_email != null ? 1 : 0
 
-  user_pool_id = aws_cognito_user_pool.main.id
+  user_pool_id = local.effective_user_pool_id
   username     = var.admin_user_email
 
   attributes = {

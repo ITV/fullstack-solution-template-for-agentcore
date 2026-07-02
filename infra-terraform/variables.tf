@@ -31,6 +31,22 @@ variable "admin_user_email" {
 }
 
 # =============================================================================
+# Optional Variables - Existing Cognito User Pool
+# =============================================================================
+
+variable "existing_user_pool_id" {
+  description = "ID of an existing Cognito User Pool to reuse (e.g. one already used for ALB authentication) instead of creating a new one. Set to null (default) to create a new dedicated pool."
+  type        = string
+  default     = null
+}
+
+variable "additional_allowed_client_ids" {
+  description = "Extra Cognito app client IDs, from the same user pool, that the Runtime's JWT authorizer should also trust (e.g. an existing ALB app client), in addition to the frontend web client."
+  type        = list(string)
+  default     = []
+}
+
+# =============================================================================
 # Backend Configuration
 # =============================================================================
 
