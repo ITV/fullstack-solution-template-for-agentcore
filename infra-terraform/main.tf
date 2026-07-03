@@ -74,6 +74,8 @@ module "cognito" {
 module "backend" {
   source = "./modules/backend"
 
+
+  container_uri           = "655028521085.dkr.ecr.eu-west-1.amazonaws.com/ghcr-io/itv/cpv3-architect-agent:sha-8060930"
   stack_name_base         = var.stack_name_base
   backend_pattern         = var.backend_pattern
   backend_deployment_type = var.backend_deployment_type

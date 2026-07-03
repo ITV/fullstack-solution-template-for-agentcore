@@ -34,6 +34,16 @@ output "gateway_target_id" {
   value       = aws_bedrockagentcore_gateway_target.sample_tool.target_id
 }
 
+output "gateway_role_name" {
+  description = "Name of the Gateway's IAM execution role. Used to grant lambda:InvokeFunction to additional Gateway Targets defined outside this module."
+  value       = aws_iam_role.gateway.name
+}
+
+output "gateway_role_arn" {
+  description = "ARN of the Gateway's IAM execution role."
+  value       = aws_iam_role.gateway.arn
+}
+
 output "tool_lambda_arn" {
   description = "Sample tool Lambda function ARN"
   value       = aws_lambda_function.sample_tool.arn

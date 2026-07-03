@@ -77,6 +77,16 @@ output "gateway_target_id" {
   value       = module.backend.gateway_target_id
 }
 
+output "gateway_role_name" {
+  description = "Name of the Gateway's IAM execution role"
+  value       = module.backend.gateway_role_name
+}
+
+output "gateway_role_arn" {
+  description = "ARN of the Gateway's IAM execution role"
+  value       = module.backend.gateway_role_arn
+}
+
 output "tool_lambda_arn" {
   description = "Sample tool Lambda function ARN"
   value       = module.backend.tool_lambda_arn
